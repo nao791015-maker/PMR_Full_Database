@@ -5,6 +5,9 @@ on:
     - cron: "0 3 * * MON"   # 毎週月曜 03:00 UTC（日本時間 12:00）
   workflow_dispatch:        # 手動実行も可能
 
+permissions:
+  contents: write           # ← GitHub Actions に書き込み権限を付与
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -33,5 +36,5 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git add PMR文献データベース.xlsx
-          git commit -m "Weekly PMR full database update"
+          git commit -m "Weekly PMR full database update" || echo "No changes to commit"
           git push
