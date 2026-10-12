@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 import time
+from bs4 import BeautifulSoup
 
 # ------------------------------
 # PubMed API settings
@@ -75,24 +76,32 @@ def fetch_details(pmids):
         xml = r.text
         records.extend(parse_xml_batch(xml))
 
-        # API負荷軽減のため少し待機
-        time.sleep(0.5)
+        time.sleep(0.5)  # API負荷軽減
 
     return records
 
 # ------------------------------
-# XML解析（バッチ処理用）
+# XML解析（BeautifulSoupで安定抽出）
 # ------------------------------
 def parse_xml_batch(xml):
     records = []
-    articles = xml.split("<PubmedArticle>")
-    for art in articles[1:]:
-        title = extract_tag(art, "ArticleTitle")
-        abstract = extract_tag(art, "AbstractText")
-        journal = extract_tag(art, "Title")
+    soup = BeautifulSoup(xml, "xml")
+    articles = soup.find_all("PubmedArticle")
+
+    for art in articles:
+        pmid = art.PMID.text if art.PMID else ""
+
+        title_tag = art.find("ArticleTitle")
+        title = title_tag.text if title_tag else ""
+
+        abstract_tags = art.find_all("AbstractText")
+        abstract = " ".join([t.text for t in abstract_tags]) if abstract_tags else ""
+
+        journal_tag = art.find("Title")
+        journal = journal_tag.text if journal_tag else ""
+
         pub_date = extract_pub_date(art)
         authors = extract_authors(art)
-        pmid = extract_tag(art, "PMID")
 
         records.append({
             "PMID": pmid,
@@ -100,40 +109,30 @@ def parse_xml_batch(xml):
             "Authors": authors,
             "Journal": journal,
             "PublicationDate": pub_date,
-            "Abstract": abstract,
+            "Abstract": abstract
         })
+
     return records
 
 # ------------------------------
 # XML解析補助関数
 # ------------------------------
-def extract_tag(xml, tag):
+def extract_pub_date(art):
     try:
-        start = xml.index(f"<{tag}>") + len(tag) + 2
-        end = xml.index(f"</{tag}>", start)
-        return xml[start:end]
-    except:
-        return ""
-
-def extract_pub_date(xml):
-    try:
-        year = extract_tag(xml, "Year")
-        month = extract_tag(xml, "Month")
-        day = extract_tag(xml, "Day")
+        year = art.find("Year").text if art.find("Year") else ""
+        month = art.find("Month").text if art.find("Month") else ""
+        day = art.find("Day").text if art.find("Day") else ""
         return f"{year}-{month}-{day}"
     except:
         return ""
 
-def extract_authors(xml):
+def extract_authors(art):
     authors = []
-    parts = xml.split("<Author>")
-    for p in parts[1:]:
-        try:
-            last = extract_tag(p, "LastName")
-            fore = extract_tag(p, "ForeName")
+    for a in art.find_all("Author"):
+        last = a.find("LastName").text if a.find("LastName") else ""
+        fore = a.find("ForeName").text if a.find("ForeName") else ""
+        if fore or last:
             authors.append(f"{fore} {last}")
-        except:
-            continue
     return ", ".join(authors)
 
 # ------------------------------
@@ -142,10 +141,19 @@ def extract_authors(xml):
 def update_excel(new_records):
     today = datetime.now().strftime("%Y-%m-%d")
 
+    # 列順を固定
+    columns = ["PMID", "Title", "Authors", "Journal", "PublicationDate", "Abstract", "Date Added"]
+
     df_new = pd.DataFrame(new_records)
     df_new["Date Added"] = today
+    df_new = df_new[columns]  # 列順固定
 
-    df_all = pd.read_excel(EXCEL_FILE, sheet_name="PMR_All")
+    # ブランクシート対応：空の場合は新規作成
+    try:
+        df_all = pd.read_excel(EXCEL_FILE, sheet_name="PMR_All")
+    except:
+        df_all = pd.DataFrame(columns=columns)
+
     existing_pmids = set(df_all["PMID"].astype(str))
 
     df_new_unique = df_new[~df_new["PMID"].astype(str).isin(existing_pmids)]
