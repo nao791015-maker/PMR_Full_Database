@@ -2,11 +2,11 @@ name: Weekly PMR Full Database Update
 
 on:
   schedule:
-    - cron: "0 3 * * MON"   # 毎週月曜 03:00 UTC（日本時間 12:00）
-  workflow_dispatch:        # 手動実行も可能
+    - cron: "0 3 * * MON"
+  workflow_dispatch:
 
 permissions:
-  contents: write           # ← GitHub Actions に書き込み権限を付与
+  contents: write
 
 jobs:
   update:
@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests pandas openpyxl
+          pip install requests pandas openpyxl beautifulsoup4
 
       - name: Run weekly update script
         env:
