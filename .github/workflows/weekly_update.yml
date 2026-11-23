@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests pandas openpyxl beautifulsoup4
+          pip install requests pandas openpyxl beautifulsoup4 lxml
 
       - name: Run weekly update script
         env:
@@ -35,6 +35,9 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+
           git add PMR文献データベース.xlsx
+
           git commit -m "Weekly PMR full database update" || echo "No changes to commit"
+
           git push
